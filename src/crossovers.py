@@ -66,7 +66,63 @@ def blend_aplha_beta_crossover(ind1: np.ndarray, ind2: np.ndarray, alpha: float,
     return child1, child2
 
 
+def uniform_crossover(ind1: np.ndarray, ind2: np.ndarray, swap_propability: float) -> tuple[np.ndarray, np.ndarray]:
+    size = min(len(ind1), len(ind2))
+
+    child1 = ind1.copy()
+    child2 = ind2.copy()
+
+    for i in range (0, size):
+        alpha = random.uniform(0, 1)
+
+        if alpha <= swap_propability:
+            child1[i] = ind2[i]
+            child2[i] = ind1[i]
+
+    return child1, child2
+
+def discrete_crossover(ind1: np.ndarray, ind2: np.ndarray) -> np.ndarray:
+    size = min(len(ind1), len(ind2))
+
+    child = ind2.copy()
+
+    for i in range (0, size):
+        alpha = random.uniform(0, 1)
+
+        if alpha <= 0.5:
+            child[i] = ind1[i]
+
+    return child
+
+
+def simple_crossover(ind1: np.ndarray, ind2: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    size = min(len(ind1), len(ind2))
+    crossover_point = crossover_point = random.randint(1, size - 1)
+
+    child1 = ind1.copy()
+    child2 = ind2.copy()
+
+    alpha = random.uniform(0, 1)
+
+    for i in range (crossover_point + 1, size):
+        child1[i] = alpha * ind2[i] + (1 - alpha) * ind1[i]
+        child2[i] = alpha * ind1[i] + (1 - alpha) * ind2[i]
+
+    return child1, child2
+
+
+def arithmetical_crossover(ind1: np.ndarray, ind2: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    size = min(len(ind1), len(ind2))
+
+    alpha = random.uniform(0, 1)
+
+    child1 = alpha * ind1 + (1 - alpha) * ind2
+    child2 = alpha * ind2 + (1 - alpha) * ind1
+
+    return child1, child2
+
+
 if __name__ == '__main__':
     i1 = np.array([11, 12, 13, 14, 15, 16, 17, 18])
     i2 = np.array([21, 22, 23, 24, 25, 26, 27, 28])
-    multipoint_crossover(i1, i2, 3)
+    arithmetical_crossover(i1, i2)
