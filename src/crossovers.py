@@ -122,7 +122,41 @@ def arithmetical_crossover(ind1: np.ndarray, ind2: np.ndarray) -> tuple[np.ndarr
     return child1, child2
 
 
+def continious_uniform_crossover(ind1: np.ndarray, ind2: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    size = min(len(ind1), len(ind2))
+
+    lower_boundary = np.min(np.maximum(ind1, ind2) / (np.maximum(ind1, ind2) - np.minimum(ind1, ind2)))
+    upper_boundary = np.max(-np.minimum(ind1, ind2) / (np.maximum(ind1, ind2) - np.minimum(ind1, ind2)))
+    alpha = random.uniform(lower_boundary, upper_boundary)
+
+    child1 = alpha * ind1 + (1 - alpha) * ind2
+    child2 = alpha * ind2 + (1 - alpha) * ind1
+
+    return child1, child2
+
+
+def curved_cylinder_crossover(ind1: np.ndarray, ind2: np.ndarray, alpha: float) -> tuple[np.ndarray, np.ndarray]:
+    size = min(len(ind1), len(ind2))
+
+    diff = sum(np.absolute(ind1, ind2))
+    if diff <= 0.0001:
+        pass
+    elif ind1.fitness.values[0] < alpha and ind2.fitness.values[0] < alpha:
+        crossover_point = random.randint(1, size - 1)
+        ind1[crossover_point:], ind2[crossover_point:] = ind2[crossover_point:], ind1[crossover_point:]
+
+        return child1, child2
+    elif ind1.fitness.values[0] > alpha or ind2.fitness.values[0] > alpha:
+        child1 = (ind1 * ind1.fitness.values[0] + ind2 * ind2.fitness.values[0]) / (ind1.fitness.values[0] + ind2.fitness.values[0])
+
+        return child1
+
+
 if __name__ == '__main__':
     i1 = np.array([11, 12, 13, 14, 15, 16, 17, 18])
     i2 = np.array([21, 22, 23, 24, 25, 26, 27, 28])
-    arithmetical_crossover(i1, i2)
+
+    diff = sum(np.absolute(i1 - i2))
+    print(np.absolute(i1 - i2))
+    print(diff)
+    curved_cylinder_crossover(i1, i2, 20)
