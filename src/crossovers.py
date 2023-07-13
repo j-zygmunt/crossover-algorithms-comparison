@@ -4,26 +4,26 @@ import random
 
 def one_point_crossover(ind1: np.ndarray, ind2: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     size = min(len(ind1), len(ind2))
-    crossover_point = random.randint(1, size - 1)
-    ind1[crossover_point:], ind2[crossover_point:] = ind2[crossover_point:], ind1[crossover_point:]
+    cxp = random.randint(1, size - 1)
+    ind1[cxp:], ind2[cxp:] = ind2[cxp:], ind1[cxp:]
 
     return ind1, ind2
 
 
-def multipoint_crossover(ind1: np.ndarray, ind2: np.ndarray, crossover_points_amount: int) -> tuple[np.ndarray, np.ndarray]:
+def multipoint_crossover(ind1: np.ndarray, ind2: np.ndarray, cxps_amount: int) -> tuple[np.ndarray, np.ndarray]:
     size = min(len(ind1), len(ind2))
-    crossover_points = sorted(random.sample(range(1, size), crossover_points_amount))
-    crossover_points.append(size)
+    cxps = sorted(random.sample(range(1, size), cxps_amount))
+    cxps.append(size)
 
     child1 = ind1.copy()
     child2 = ind2.copy()
 
     previous_index = 0
-    for i in range(0, len(crossover_points)):
+    for i in range(0, len(cxps)):
         if i % 2 == 1:
-            print(ind2[crossover_points[previous_index]:crossover_points[i]])
-            child1[crossover_points[previous_index]:crossover_points[i]] = ind2[crossover_points[previous_index]:crossover_points[i]]
-            child2[crossover_points[previous_index]:crossover_points[i]] = ind1[crossover_points[previous_index]:crossover_points[i]]
+            print(ind2[cxps[previous_index]:cxps[i]])
+            child1[cxps[previous_index]:cxps[i]] = ind2[cxps[previous_index]:cxps[i]]
+            child2[cxps[previous_index]:cxps[i]] = ind1[cxps[previous_index]:cxps[i]]
         previous_index = i
 
     return child1, child2
@@ -97,23 +97,20 @@ def discrete_crossover(ind1: np.ndarray, ind2: np.ndarray) -> np.ndarray:
 
 def simple_crossover(ind1: np.ndarray, ind2: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     size = min(len(ind1), len(ind2))
-    crossover_point = crossover_point = random.randint(1, size - 1)
+    cxp = cxp = random.randint(1, size - 1)
 
     child1 = ind1.copy()
     child2 = ind2.copy()
 
     alpha = random.uniform(0, 1)
 
-    for i in range (crossover_point + 1, size):
-        child1[i] = alpha * ind2[i] + (1 - alpha) * ind1[i]
-        child2[i] = alpha * ind1[i] + (1 - alpha) * ind2[i]
+    child1[cxp + 1:] = alpha * ind2[cxp + 1:] + (1 - alpha) * ind1[cxp + 1:]
+    child2[cxp + 1:] = alpha * ind1[cxp + 1:] + (1 - alpha) * ind2[cxp + 1:]
 
     return child1, child2
 
 
 def arithmetical_crossover(ind1: np.ndarray, ind2: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    size = min(len(ind1), len(ind2))
-
     alpha = random.uniform(0, 1)
 
     child1 = alpha * ind1 + (1 - alpha) * ind2
@@ -123,8 +120,6 @@ def arithmetical_crossover(ind1: np.ndarray, ind2: np.ndarray) -> tuple[np.ndarr
 
 
 def continious_uniform_crossover(ind1: np.ndarray, ind2: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    size = min(len(ind1), len(ind2))
-
     lower_boundary = np.min(np.maximum(ind1, ind2) / (np.maximum(ind1, ind2) - np.minimum(ind1, ind2)))
     upper_boundary = np.max(-np.minimum(ind1, ind2) / (np.maximum(ind1, ind2) - np.minimum(ind1, ind2)))
     alpha = random.uniform(lower_boundary, upper_boundary)
@@ -142,8 +137,8 @@ def curved_cylinder_crossover(ind1: np.ndarray, ind2: np.ndarray, alpha: float) 
     if diff <= 0.0001:
         pass
     elif ind1.fitness.values[0] < alpha and ind2.fitness.values[0] < alpha:
-        crossover_point = random.randint(1, size - 1)
-        ind1[crossover_point:], ind2[crossover_point:] = ind2[crossover_point:], ind1[crossover_point:]
+        cxp = random.randint(1, size - 1)
+        ind1[cxp:], ind2[cxp:] = ind2[cxp:], ind1[cxp:]
 
         return child1, child2
     elif ind1.fitness.values[0] > alpha or ind2.fitness.values[0] > alpha:
@@ -152,11 +147,73 @@ def curved_cylinder_crossover(ind1: np.ndarray, ind2: np.ndarray, alpha: float) 
         return child1
 
 
+def diverse_crossover(ind1: np.ndarray, ind2: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    size = min(len(ind1), len(ind2))
+    beta = np.random.choice(np.linspace(0, 1, num=11), size=1)
+    cxp = cxp = random.randint(1, size - 1)
+
+    child1 = ind1.copy()
+    child2 = ind2.copy()
+
+    child1[cxp] = ind1[cxp] + beta * (ind2[cxp] - ind1[cxp])
+    child2[cxp] = min(ind1[cxp], ind2[cxp]) + beta * (max(ind1[cxp], ind2[cxp]) - min(ind1[cxp], ind2[cxp]))
+
+    child1[cxp + 1:] = ind2[cxp + 1:]
+    child2[cxp + 1:] = ind1[cxp + 1:]
+
+    return child1, child2
+
+
+def parent_centric_blx_aplha_crossover(ind1: np.ndarray, ind2: np.ndarray, alpha: float) -> np.ndarray:
+    size = min(len(ind1), len(ind2))
+    diff = np.absolute(ind1 - ind2)
+
+    child = np.zeros(size)
+
+    lower_boundary = np.minimum(ind1, ind2)
+    upper_boundary = np.maximum(ind1, ind2)
+
+    if random.uniform(0, 1) <= 0.5:
+        start = np.maximum(lower_boundary, ind1 - alpha * diff)
+        end = np.minimum(upper_boundary, ind1 + alpha * diff)
+        child = np.random.uniform(start, end, size=size)
+    else:
+        start = np.maximum(lower_boundary, ind2 - alpha * diff)
+        end = np.minimum(upper_boundary, ind2 + alpha * diff)
+        child = np.random.uniform(start, end, size=size)
+
+    return child
+
+
+def inheritance_crossover(ind1: np.ndarray, ind2: np.ndarray) -> np.ndarray:
+    size = min(len(ind1), len(ind2))
+
+    f = np.zeros(size - 1)
+    g = np.zeros(size - 1)
+
+    for i in range(0, size - 1):
+        f[i] = i1[i] / i1[i + 1]
+        g[i] = i1[i] / i1[i + 1]
+
+    cxp = cxp = random.randint(1, size - 1)
+
+    child1 = ind1.copy()
+    child2 = ind2.copy()
+
+    child1[cpx] = 1 /  g[cpx] * ind1[cpx]
+    child2[cpx] = 1 /  f[cpx] * ind2[cpx]
+
+    return child1, child2
+
+
+def sphere_crossover(ind1: np.ndarray, ind2: np.ndarray) -> np.ndarray:
+    alpha = random.uniform(0, 1)
+
+    return np.sqrt(alpha * ind1 ** 2 + (1 - alpha) * ind2 ** 2)
+
+
 if __name__ == '__main__':
     i1 = np.array([11, 12, 13, 14, 15, 16, 17, 18])
-    i2 = np.array([21, 22, 23, 24, 25, 26, 27, 28])
+    i2 = np.array([21, 22, 1, 24, 25, 26, 27, 28])
 
-    diff = sum(np.absolute(i1 - i2))
-    print(np.absolute(i1 - i2))
-    print(diff)
-    curved_cylinder_crossover(i1, i2, 20)
+    print(sphere_crossover(i1, i2))
