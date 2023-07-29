@@ -1,95 +1,74 @@
-#    This file is part of DEAP.
-#
-#    DEAP is free software: you can redistribute it and/or modify
-#    it under the terms of the GNU Lesser General Public License as
-#    published by the Free Software Foundation, either version 3 of
-#    the License, or (at your option) any later version.
-#
-#    DEAP is distributed in the hope that it will be useful,
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-#    GNU Lesser General Public License for more details.
-#
-#    You should have received a copy of the GNU Lesser General Public
-#    License along with DEAP. If not, see <http://www.gnu.org/licenses/>.
+import opfunu
+from dataclasses import asdict
+from datetime import datetime
 
-import random
-
-import numpy
-
-from deap import algorithms
-from deap import base
-from deap import creator
-from deap import tools
-
-creator.create("FitnessMax", base.Fitness, weights=(1.0,))
-creator.create("Individual", numpy.ndarray, fitness=creator.FitnessMax)
-
-toolbox = base.Toolbox()
-
-toolbox.register("attr_bool", random.randint, 0, 1)
-toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_bool, n=100)
-toolbox.register("population", tools.initRepeat, list, toolbox.individual)
-
-def evalOneMax(individual):
-    return sum(individual),
-
-def cxTwoPointCopy(ind1, ind2):
-    """Execute a two points crossover with copy on the input individuals. The
-    copy is required because the slicing in numpy returns a view of the data,
-    which leads to a self overwriting in the swap operation. It prevents
-    ::
-
-        >>> import numpy
-        >>> a = numpy.array((1,2,3,4))
-        >>> b = numpy.array((5,6,7,8))
-        >>> a[1:3], b[1:3] = b[1:3], a[1:3]
-        >>> print(a)
-        [1 6 7 4]
-        >>> print(b)
-        [5 6 7 8]
-    """
-    size = len(ind1)
-    cxpoint1 = random.randint(1, size)
-    cxpoint2 = random.randint(1, size - 1)
-    if cxpoint2 >= cxpoint1:
-        cxpoint2 += 1
-    else: # Swap the two cx points
-        cxpoint1, cxpoint2 = cxpoint2, cxpoint1
-
-    ind1[cxpoint1:cxpoint2], ind2[cxpoint1:cxpoint2] \
-        = ind2[cxpoint1:cxpoint2].copy(), ind1[cxpoint1:cxpoint2].copy()
-
-    return ind1, ind2
+from utils import eval_decorator
+import config
+import crossovers
+import ga
+import database
 
 
-toolbox.register("evaluate", evalOneMax)
-toolbox.register("mate", cxTwoPointCopy)
-toolbox.register("mutate", tools.mutFlipBit, indpb=0.05)
-toolbox.register("select", tools.selBest)
+configs2D = [
+    config.GAConfig(cx=crossovers.one_point_crossover),
+    config.GAConfig(cx=crossovers.multipoint_crossover, cx_params={'cxps_amount':5}),
+    config.GAConfig(cx=crossovers.uniform_crossover, cx_params={'swap_propability':0.5}),
+    config.GAConfig(cx=crossovers.discrete_crossover),
+    config.GAConfig(cx=crossovers.average_crossover),
+    config.GAConfig(cx=crossovers.blend_alpha_crossover, cx_params={'alpha':0.5}),
+    config.GAConfig(cx=crossovers.blend_alpha_beta_crossover, cx_params={'alpha':0.75, 'beta':0.25}),
+    config.GAConfig(cx=crossovers.arithmetical_crossover),
+    config.GAConfig(cx=crossovers.simple_crossover),
+    config.GAConfig(cx=crossovers.diverse_crossover),
+    config.GAConfig(cx=crossovers.parent_centric_blx_alpha_crossover, cx_params={'alpha': 0.5}),
+    config.GAConfig(cx=crossovers.inheritance_crossover),
+    config.GAConfig(cx=crossovers.gene_pooling_crossover),
+    config.GAConfig(cx=crossovers.adaptive_probablility_of_gene_crossover),
+]
 
-def main():
-    random.seed(64)
+ccc_configs = [
+    config.GAConfig(cx=crossovers.curved_cylinder_crossover),
+    config.GAConfig(cx=crossovers.curved_cylinder_crossover, dim = 10),
+    config.GAConfig(cx=crossovers.curved_cylinder_crossover, dim = 20)
+]
 
-    pop = toolbox.population(n=300)
-
-    # Numpy equality function (operators.eq) between two arrays returns the
-    # equality element wise, which raises an exception in the if similar()
-    # check of the hall of fame. Using a different equality function like
-    # numpy.array_equal or numpy.allclose solve this issue.
-    hof = tools.HallOfFame(1, similar=numpy.array_equal)
-
-    stats = tools.Statistics(lambda ind: ind.fitness.values)
-    stats.register("avg", numpy.mean)
-    stats.register("std", numpy.std)
-    stats.register("min", numpy.min)
-    stats.register("max", numpy.max)
-
-    pop, logbook = algorithms.eaMuPlusLambda(pop, toolbox, mu=300, lambda_=300,
-                                          cxpb=0.5,   mutpb=0.3, ngen=40, 
-                                          stats=stats, halloffame=hof)
-
-    return pop, stats, hof
+fitness_functions = [
+    {'fun':"F22022", 'cx_params':{'alpha': 440.0}},
+    {'fun':"F52022", 'cx_params':{'alpha': 990.0}},
+]
 
 if __name__ == "__main__":
-    main()
+    # for cfg in configs2D:
+    #     for fun in fitness_functions:
+    #         func = opfunu.get_functions_by_classname(fun['fun'])[0](ndim=cfg.dim)
+    #         cfg.fun = eval_decorator(func.evaluate)
+
+    # for cfg in ccc_configs:
+    #     for fun in fitness_functions:
+    #         cfg.fun = fun['fun']
+    #         if fun['cx_params'] is not None:
+    #             cfg.cx_params = fun['cx_params']
+
+    cfg = config.GAConfig(cx=crossovers.one_point_crossover)
+
+    con = database.get_db_connection('db/Experiments.db')
+    database.clear_db(con)
+    database.prepare_db(con)
+
+    for fun in fitness_functions:
+        func = opfunu.get_functions_by_classname(fun['fun'])[0](ndim=cfg.dim)
+        cfg.fun = eval_decorator(func.evaluate)
+        pop, stats, hof, logbook = ga.evaluate_ga(cfg)
+
+        date = datetime.now()
+        cfg_str = str(config.config_asdict(cfg))
+        for log in logbook:
+            log['experiment_id'] = 1
+            log['cx'] = cfg.cx.__name__
+            log['fun'] = fun['fun']
+            log['dim'] = cfg.dim
+            log['date'] = date
+            log['config'] = cfg_str
+            log['best'] = str(log['best'])
+
+            database.insert_experiment_data(con, log)
