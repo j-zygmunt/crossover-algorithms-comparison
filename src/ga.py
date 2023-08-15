@@ -4,9 +4,17 @@ from deap import algorithms
 from deap import base
 from deap import creator
 from deap import tools
+from datetime import datetime
+from itertools import repeat
+
+try:
+    from collections.abc import Sequence
+except ImportError:
+    from collections import Sequence
 
 import config
 from utils import eval_decorator
+
 
 r""" This code inspired by DEAP`s :func:`varOr` ad :func:`varAnd`.
 Part of an evolutionary algorithm applying crossover or reproduction and mutation.
@@ -45,7 +53,7 @@ The rest works like standard :func:`eaMuPlusLambda`.
 def eaMuPlusLambda(population, toolbox, mu, lambda_, cxpb, mutpb, ngen, elite,
                    stats=None, halloffame=None, verbose=__debug__):
     logbook = tools.Logbook()
-    logbook.header = ['gen', 'nevals'] + (stats.fields if stats else []) + ['best']
+    logbook.header = ['gen', 'nevals'] + (stats.fields if stats else []) + ['best', 'date']
 
     # Evaluate the individuals with an invalid fitness
     invalid_ind = [ind for ind in population if not ind.fitness.valid]
@@ -58,6 +66,7 @@ def eaMuPlusLambda(population, toolbox, mu, lambda_, cxpb, mutpb, ngen, elite,
 
     record = stats.compile(population) if stats is not None else {}
     record['best'] = halloffame.__getitem__(0).tolist()
+    record['date'] = datetime.now()
     logbook.record(gen=0, nevals=len(invalid_ind), **record)
     if verbose:
         print(logbook.stream)
@@ -67,8 +76,9 @@ def eaMuPlusLambda(population, toolbox, mu, lambda_, cxpb, mutpb, ngen, elite,
         # Elite strategy
         listElitism = list(map(toolbox.clone, tools.selBest(population, elite)))
 
+        offspring = toolbox.select(population, k=mu-elite)
         # Vary the population
-        offspring = var(population, toolbox, lambda_, cxpb, mutpb)
+        offspring = var(offspring, toolbox, lambda_, cxpb, mutpb)
 
         # Evaluate the individuals with an invalid fitness
         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
@@ -81,11 +91,12 @@ def eaMuPlusLambda(population, toolbox, mu, lambda_, cxpb, mutpb, ngen, elite,
             halloffame.update(offspring)
 
         # Select the next generation population
-        population[:] = toolbox.select(population + offspring + listElitism, mu)
+        population[:] = offspring + listElitism
 
         # Update the statistics with the new population
         record = stats.compile(population) if stats is not None else {}
         record['best'] = halloffame.__getitem__(0).tolist()
+        record['date'] = datetime.now()
         logbook.record(gen=gen, nevals=len(invalid_ind), **record)
         if verbose:
             print(logbook.stream)
@@ -93,8 +104,38 @@ def eaMuPlusLambda(population, toolbox, mu, lambda_, cxpb, mutpb, ngen, elite,
     return population, logbook
 
 
+def mutUniform(individual, low, up, indpb):
+    """Mutate an individual by replacing attributes, with probability *indpb*,
+    by a integer uniformly drawn between *low* and *up* inclusively.
+
+    :param individual: :term:`Sequence <sequence>` individual to be mutated.
+    :param low: The lower bound or a :term:`python:sequence` of
+                of lower bounds of the range from which to draw the new
+                integer.
+    :param up: The upper bound or a :term:`python:sequence` of
+               of upper bounds of the range from which to draw the new
+               integer.
+    :param indpb: Independent probability for each attribute to be mutated.
+    :returns: A tuple of one individual.
+    """
+    size = len(individual)
+    if not isinstance(low, Sequence):
+        low = repeat(low, size)
+    elif len(low) < size:
+        raise IndexError("low must be at least the size of individual: %d < %d" % (len(low), size))
+    if not isinstance(up, Sequence):
+        up = repeat(up, size)
+    elif len(up) < size:
+        raise IndexError("up must be at least the size of individual: %d < %d" % (len(up), size))
+
+    for i, xl, xu in zip(range(size), low, up):
+        if random.random() < indpb:
+            individual[i] = random.uniform(xl, xu)
+
+    return individual,
+
+
 def evaluate_ga(cfg: config.GAConfig):
-    # random.seed(64)
 
     if cfg.is_min:
         creator.create("Fitness", base.Fitness, weights=(-1.0,))
@@ -109,9 +150,9 @@ def evaluate_ga(cfg: config.GAConfig):
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("evaluate", cfg.fun)
     toolbox.register("mate", cfg.cx, **cfg.cx_params)
-    toolbox.register("mutate", tools.mutGaussian, indpb=0.5, sigma=1, mu=0)
-    # toolbox.register("mutate", tools.mutShuffleIndexes, indpb=0.5)
-    toolbox.register("select", tools.selTournament, tournsize=5)
+    # toolbox.register("mutate", tools.mutGaussian, indpb=0.3, sigma=1, mu=0)
+    toolbox.register("mutate", mutUniform, indpb=0.5, low=cfg.x_min, up=cfg.x_max)
+    toolbox.register("select", tools.selTournament, tournsize=15)
 
     pop = toolbox.population(n=cfg.pop_size)
     hof = tools.HallOfFame(1, similar=np.array_equal)
