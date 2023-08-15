@@ -7,13 +7,13 @@ class GAConfig:
     fun: callable = None
     is_min: bool = True
     dim: int = 2
-    max_epoch: int = 100
+    max_epoch: int = 2000
     pop_size: int = 500
     x_max: float = 100.0
     x_min: float = -100.0
-    cxpb: float = 0.8
-    mutpb: float = 0.2
-    elite_size: int = 5
+    cxpb: float = 0.7
+    mutpb: float = 0.1
+    elite_size: int = 15
 
 
 def config_asdict(cfg: GAConfig):

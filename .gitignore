@@ -2,3 +2,5 @@
 .vscode
 src/__pycache__
 src/db/Experiments.db
+__pycache__/
+lib
