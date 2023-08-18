@@ -36,3 +36,13 @@ def insert_experiment_data(connection: sqlite3.Connection, data: dict)-> None:
     cursor.execute(f"INSERT INTO experiments ({columns}) VALUES ({names})", values)
     cursor.close()
     connection.commit()
+
+
+def insert_experiment_data_batch(connection: sqlite3.Connection, data: list)-> None:
+    columns = ', '.join(data[0].keys())
+    names = ", ".join("?" * len(data[0].keys()))
+    values = [list(d.values()) for d in data]
+    cursor = connection.cursor()
+    cursor.executemany(f"INSERT INTO experiments ({columns}) VALUES ({names})", values)
+    cursor.close()
+    connection.commit()
