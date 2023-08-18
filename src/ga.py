@@ -6,6 +6,9 @@ from deap import creator
 from deap import tools
 from datetime import datetime
 from itertools import repeat
+import multiprocessing
+from multiprocessing.pool import ThreadPool
+from multiprocessing.dummy import Pool
 
 try:
     from collections.abc import Sequence
@@ -21,9 +24,9 @@ Part of an evolutionary algorithm applying crossover or reproduction and mutatio
 The modified individuals have their fitness invalidated.
 The individuals are cloned so returned population is independent of the input population.
 """
-def var(population, toolbox, lambda_, cxpb, mutpb):
+def var(population, toolbox, number_of_children, cxpb, mutpb):
     offspring = []
-    while len(offspring) <= lambda_:
+    while len(offspring) <= number_of_children:
         if random.random() < cxpb:
             ind1, ind2 = [toolbox.clone(i) for i in random.sample(population, 2)]
             children = toolbox.mate(ind1, ind2)
@@ -38,6 +41,8 @@ def var(population, toolbox, lambda_, cxpb, mutpb):
         else:
             offspring += random.sample(population, 2)
 
+    offspring += population
+
     for i in range(len(offspring)):
         if random.random() < mutpb:
             offspring[i], = toolbox.mutate(offspring[i])
@@ -50,7 +55,7 @@ r""" This code inspired by DEAP`s eaMuPlusLambda.
 Algorithm is extended with elite strategy and changed vary :func:`var`.
 The rest works like standard :func:`eaMuPlusLambda`.
 """
-def eaMuPlusLambda(population, toolbox, mu, lambda_, cxpb, mutpb, ngen, elite,
+def eaMuPlusLambda(population, toolbox, pop_size, select_size, cxpb, mutpb, ngen, elite_size,
                    stats=None, halloffame=None, verbose=__debug__):
     logbook = tools.Logbook()
     logbook.header = ['gen', 'nevals'] + (stats.fields if stats else []) + ['best', 'date']
@@ -74,11 +79,11 @@ def eaMuPlusLambda(population, toolbox, mu, lambda_, cxpb, mutpb, ngen, elite,
     # Begin the generational process
     for gen in range(1, ngen + 1):
         # Elite strategy
-        listElitism = list(map(toolbox.clone, tools.selBest(population, elite)))
+        listElitism = list(map(toolbox.clone, tools.selBest(population, elite_size)))
 
-        offspring = toolbox.select(population, k=mu-elite)
+        offspring = toolbox.select(toolbox.clone(population), k=select_size)
         # Vary the population
-        offspring = var(offspring, toolbox, lambda_, cxpb, mutpb)
+        offspring = var(offspring, toolbox, pop_size - select_size, cxpb, mutpb)
 
         # Evaluate the individuals with an invalid fitness
         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
@@ -145,13 +150,14 @@ def evaluate_ga(cfg: config.GAConfig):
     creator.create("Individual", np.ndarray, fitness=creator.Fitness)
 
     toolbox = base.Toolbox()
+
     toolbox.register("attr_float", random.uniform, cfg.x_min, cfg.x_max)
     toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_float, n=cfg.dim)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("evaluate", cfg.fun)
     toolbox.register("mate", cfg.cx, **cfg.cx_params)
-    # toolbox.register("mutate", tools.mutGaussian, indpb=0.3, sigma=1, mu=0)
-    toolbox.register("mutate", mutUniform, indpb=0.5, low=cfg.x_min, up=cfg.x_max)
+    toolbox.register("mutate", tools.mutGaussian, indpb=0.5, sigma=1, mu=0)
+    # toolbox.register("mutate", mutUniform, indpb=0.5, low=cfg.x_min, up=cfg.x_max)
     toolbox.register("select", tools.selTournament, tournsize=15)
 
     pop = toolbox.population(n=cfg.pop_size)
@@ -165,9 +171,9 @@ def evaluate_ga(cfg: config.GAConfig):
 
     pop, logbook = eaMuPlusLambda(pop,
         toolbox,
-        mu=cfg.pop_size,
-        lambda_=cfg.pop_size,
-        elite=cfg.elite_size,
+        pop_size=cfg.pop_size,
+        select_size=cfg.select_size,
+        elite_size=cfg.elite_size,
         cxpb=cfg.cxpb,
         mutpb=cfg.mutpb,
         ngen=cfg.max_epoch,

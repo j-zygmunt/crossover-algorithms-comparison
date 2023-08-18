@@ -6,9 +6,10 @@ class GAConfig:
     cx_params: dict = field(default_factory=dict)
     fun: callable = None
     is_min: bool = True
-    dim: int = 2
-    max_epoch: int = 2000
-    pop_size: int = 500
+    dim: int = None
+    max_epoch: int = 1000
+    pop_size: int = None
+    select_size: int = None
     x_max: float = 100.0
     x_min: float = -100.0
     cxpb: float = 0.7

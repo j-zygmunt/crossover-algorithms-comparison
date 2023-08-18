@@ -207,28 +207,44 @@ def parent_centric_blx_alpha_crossover(
     return ind1
 
 
-def inheritance_crossover(
+# def inheritance_crossover(
+#     ind1: np.ndarray,
+#     ind2: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+
+#     size = min(len(ind1), len(ind2))
+
+#     f = np.zeros(size - 1)
+#     g = np.zeros(size - 1)
+
+#     for i in range(0, size - 1):
+#         f[i] = ind1[i + 1] / ind1[i]
+#         g[i] = ind2[i + 1] / ind2[i]
+
+#     np.nan_to_num(f, nan=1, copy=False, posinf=1, neginf=1)
+#     np.nan_to_num(g, nan=1, copy=False, posinf=1, neginf=1)
+
+#     cxp = random.randint(0, size - 2)
+
+#     if (not math.isclose(g[cxp] * ind1[cxp], 0.0)) and (not math.isclose(f[cxp] * ind2[cxp], 0.0)):
+#         ind1[cxp] = 1 /  g[cxp] * ind1[cxp]
+#         ind2[cxp] = 1 /  f[cxp] * ind2[cxp]
+
+#     return ind1, ind2
+
+
+def fitness_guided_crossover(
     ind1: np.ndarray,
-    ind2: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    ind2: np.ndarray) -> np.ndarray:
 
     size = min(len(ind1), len(ind2))
+    alpha = random.uniform(-0.5, 0.5)
 
-    f = np.zeros(size - 1)
-    g = np.zeros(size - 1)
+    if ind1.fitness < ind2.fitness:
+        ind1[:] = ind1 + alpha * (ind1 - ind2)
+    else:
+        ind1[:] = ind2 + alpha * (ind2 - ind1)
 
-    for i in range(0, size - 1):
-        f[i] = ind1[i + 1] / ind1[i]
-        g[i] = ind2[i + 1] / ind2[i]
-
-    np.nan_to_num(f, nan=1, copy=False, posinf=1, neginf=1)
-    np.nan_to_num(g, copy=False, posinf=1, neginf=1)
-
-    cxp = random.randint(0, size - 2)
-
-    ind1[cxp] = 1 /  g[cxp] * ind1[cxp]
-    ind2[cxp] = 1 /  f[cxp] * ind2[cxp]
-
-    return ind1, ind2
+    return ind1
 
 
 def adaptive_probablility_of_gene_crossover(
